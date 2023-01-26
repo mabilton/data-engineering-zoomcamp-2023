@@ -1,0 +1,6 @@
+*.csv*
+*.gz*
+*.ipynb_checkpoints
+.terraform/
+.terraform.*
+terraform.tfstate*
