@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Union
 
 import pandas as pd
 from prefect import flow, task
@@ -61,7 +61,7 @@ def write_bq(
 def etl_gcs_to_bq(
     color: str = "yellow",
     year: int = 2021,
-    months: Sequence[int] = (1,),
+    months: Union[int, Sequence[int]] = 1,
     gcs_bucket_block_name: str = "gcs-zoomcamp",
     gcs_cred_block_name: str = "zoomcamp",
     gcs_data_dir: str = "data",
@@ -90,7 +90,3 @@ def etl_gcs_to_bq(
         )
         num_rows_processed += len(df)
     print(f"Total number of rows processed = {num_rows_processed}")
-
-
-if __name__ == "__main__":
-    etl_gcs_to_bq()
