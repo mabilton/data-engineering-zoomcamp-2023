@@ -22,52 +22,40 @@ should set up the GCS Bucket and BigQuery database we need.
 
 ### Answer
 
-```bash
-17:24:41.393 | INFO    | prefect.engine - Created flow run 'smoky-pig' for flow 'etl-web-to-gcs'
-17:24:41.562 | INFO    | Flow run 'smoky-pig' - Created task run 'fetch-0' for task 'fetch'
-17:24:41.563 | INFO    | Flow run 'smoky-pig' - Executing 'fetch-0' immediately...
-/home/mabilton/Documents/Notes/data-engineering-zoomcamp-2023/02-orchestration/homework/etl_to_gcs.py:10: DtypeWarning: Columns (3) have mixed types. Specify dtype option on import or set low_memory=False.
-  df = pd.read_csv(dataset_url)
-17:24:43.054 | INFO    | Task run 'fetch-0' - Finished in state Completed()
-17:24:43.089 | INFO    | Flow run 'smoky-pig' - Created task run 'clean-0' for task 'clean'
-17:24:43.090 | INFO    | Flow run 'smoky-pig' - Executing 'clean-0' immediately...
-17:24:43.298 | INFO    | Task run 'clean-0' -    VendorID lpep_pickup_datetime lpep_dropoff_datetime store_and_fwd_flag  ...  total_amount  payment_type  trip_type  congestion_surcharge
-0       2.0  2019-12-18 15:52:30   2019-12-18 15:54:39                  N  ...          4.81           1.0        1.0                   0.0
-1       2.0  2020-01-01 00:45:58   2020-01-01 00:56:39                  N  ...         24.36           1.0        2.0                   0.0
 
-[2 rows x 20 columns]
-17:24:43.299 | INFO    | Task run 'clean-0' - columns: VendorID                        float64
-lpep_pickup_datetime     datetime64[ns]
-lpep_dropoff_datetime    datetime64[ns]
-store_and_fwd_flag               object
-RatecodeID                      float64
-PULocationID                      int64
-DOLocationID                      int64
-passenger_count                 float64
-trip_distance                   float64
-fare_amount                     float64
-extra                           float64
-mta_tax                         float64
-tip_amount                      float64
-tolls_amount                    float64
-ehail_fee                       float64
-improvement_surcharge           float64
-total_amount                    float64
-payment_type                    float64
-trip_type                       float64
-congestion_surcharge            float64
-dtype: object
+Create GCP credential block:
+```
+cd blocks && \
+python3 -m gcp_cred \
+--credentials=/home/mabilton/clear-nebula-375807-143b9f4e2461.json \
+--block_name='gcp-cred-zoomcamp' && \
+cd ..
+```
+
+Create GCS bucket block:
+```bash
+cd blocks && \
+python3 -m gcs_bucket \
+--bucket='zoomcamp_data_lake_clear-nebula-375807' \
+--cred_block='gcp-cred-zoomcamp' \
+--block_name='gcs-bucket-zoomcamp' && \
+cd ..
+```
+
+Can then run flow:
+```
+cd flows & \
+python3 -m etl_to_gcs \
+--color='green' \
+--months=1 \
+--year=2020 \
+--save_dir='data' \
+--gcs_block='gcs-bucket-zoomcamp' && \
+cd ..
+```
+
+```bash
 17:24:43.300 | INFO    | Task run 'clean-0' - rows: 447770
-17:24:43.323 | INFO    | Task run 'clean-0' - Finished in state Completed()
-17:24:43.347 | INFO    | Flow run 'smoky-pig' - Created task run 'write_local-0' for task 'write_local'
-17:24:43.348 | INFO    | Flow run 'smoky-pig' - Executing 'write_local-0' immediately...
-17:24:44.353 | INFO    | Task run 'write_local-0' - Finished in state Completed()
-17:24:44.390 | INFO    | Flow run 'smoky-pig' - Created task run 'write_gcs-0' for task 'write_gcs'
-17:24:44.391 | INFO    | Flow run 'smoky-pig' - Executing 'write_gcs-0' immediately...
-17:24:44.555 | INFO    | Task run 'write_gcs-0' - Getting bucket 'zoomcamp_data_lake_clear-nebula-375807'.
-17:24:45.313 | INFO    | Task run 'write_gcs-0' - Uploading from PosixPath('data/green/green_tripdata_2020-01.parquet') to the bucket 'zoomcamp_data_lake_clear-nebula-375807' path 'data/green/green_tripdata_2020-01.parquet'.
-17:24:46.245 | INFO    | Task run 'write_gcs-0' - Finished in state Completed()
-17:24:46.286 | INFO    | Flow run 'smoky-pig' - Finished in state Completed('All states completed.')
 ```
 
 ## Question 2
@@ -96,7 +84,14 @@ Let's break this down:
 
 To create a deployment that runs `etl_to_gcs.py` using this `cron`, we can use the CLI:
 ```bash
-prefect deployment build etl_to_gcs.py:etl_web_to_gcs -n etl_gcs_flow --cron "0 5 1 * *" -a
+prefect deployment build \
+-n etl_gcs_flow \
+--cron "0 5 1 * *" \
+--apply flows/etl_to_gcs.py:etl_web_to_gcs 
+```
+We note from the output of this:
+```
+Deployment 'etl-web-to-gcs/etl_gcs_flow' successfully created with id '04f61713-d2fd-44c9-a846-7066ffae3f7a'.
 ```
 
 ## Question 3
@@ -105,10 +100,18 @@ prefect deployment build etl_to_gcs.py:etl_web_to_gcs -n etl_gcs_flow --cron "0 
 
 ### Answer
 
+
 Need to upload Yellow taxi data for Feb. 2019 and March 2019 to GCS using `etl_to_gcs.py`. As a simple way to do this without creating
 any additional deployments, we can run from the commandline:
 ```bash
-python3 -c 'from etl_to_gcs import etl_web_to_gcs; etl_web_to_gcs(color="yellow", year=2019, months=[2, 3])'
+cd flows & \
+python3 -m etl_to_gcs \
+--color='yellow' \
+--months=[2,3] \
+--year=2019 \
+--save_dir='data' \
+--gcs_block='gcs-bucket-zoomcamp' && \
+cd ..
 ```
 
 Please note that the Yellow Taxi datasets are substatially larger than the Green taxi datasets, so this will take noticably longer than our previous execution of the `etl_web_to_gcs` flow. 
@@ -116,16 +119,26 @@ Please note that the Yellow Taxi datasets are substatially larger than the Green
 Once this is successfully completed, we can create a deployment:
 
 ```bash
-prefect deployment build etl_to_bq.py:etl_gcs_to_bq -n etl_bq_flow -a
+prefect deployment build \
+-n etl_bq_flow \
+--apply flows/etl_to_bq.py:etl_gcs_to_bq  
 ```
-
+From the output of this we note:
+```bash
+Deployment 'etl-gcs-to-bq/etl_bq_flow' successfully created with id '2d47c586-8d66-4dd8-82a6-e54e67d8c4b9'.
+```
+Can start Prefect agent in anticipation of running this flow:
 ```bash
 prefect agent start -q 'default'
 ```
 
 To execute this deployment, we can run:
-```
-prefect deployment run --param color="yellow" --param year=2019 --param months=[2,3] etl-gcs-to-bq/etl_bq_flow
+```bash
+prefect deployment run \
+--param color="yellow" \
+--param year=2019 \
+--param months=[2,3] \
+etl-gcs-to-bq/etl_bq_flow
 ```
 
 Upon inspecting the logs for this deployment (either through the CLI or the Orion UI), we should see the following output printed near the very end:
@@ -139,7 +152,30 @@ Total number of rows processed = 14851920
 
 ### Answer
 
+```bash
+cd blocks && \
+python3 -m github \
+--repo=https://github.com/mabilton/data-engineering-zoomcamp-2023 \
+--block_name='gh-zoomcamp' && \
+cd ..
+```
 
+```
+cd ../.. && \
+prefect deployment build \
+-n gh \
+-sb github/gh-zoomcamp \
+--apply 02-orchestration/homework/flows/etl_to_gcs.py:etl_web_to_gcs && \
+cd 02-orchestration/homework
+```
+
+```bash
+prefect deployment run \
+--param color="green" \
+--param year=2020 \
+--param months=[11] \
+etl-web-to-gcs/gh_etl_web_to_gcs
+```
 
 ## Cleaning Up
 
