@@ -732,3 +732,8 @@ google_bigquery_dataset.dataset: Destruction complete after 2s
 
 Destroy complete! Resources: 2 destroyed.
 ```
+
+## Extras
+
+This point marks the end of my answers to the Week 1 homework questions. Although the computational tools we used to answer these questions worked as intended, there's definitely room for imrovement. In particular, the ingestion process we utilised here was, by far, the slowest part of our workflow, with our Python ingestion script taking between one to two minutes to ingest the 'Green Taxi Data' CSV file. With this in mind, `03-extras.md` goes over how the ingestion process can be *significantly* sped up by replacing the `pandas`'s `to_sql` method called within `ingest.py` with `psycopg2`'s `copy_from` method.
+
