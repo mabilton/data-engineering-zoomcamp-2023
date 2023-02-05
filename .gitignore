@@ -1,8 +1,18 @@
+# Data files:
 *.csv*
 *.gz*
+*.parquet
+data
+
+# Python files:
 *.ipynb_checkpoints
 __pycache__
+
+# Terraform files:
 .terraform/
 .terraform.*
 terraform.tfstate*
-data
+
+# Prefect files:
+.prefectignore
+*-deployment.yaml

@@ -1,149 +1,417 @@
 
 
-## Setting Up GCS
+# Week 2 Homework Answers
 
-Use Terraform; for convenience, we've copied over the `terraform` directory from `01-intro/homework` to `02-orchestration/homework`;
+This file contains my answers to the Week 2 homework questions for the 2023 cohort of the Data Engineering Zoomcamp. For convenience, each question is restated before giving the corresponding answer; the list of questions *without* corresponding answers can be found in `01-questions.md`, which can be found in the current directory.
 
-First run:
+Please note that all of the intructions provided here **assume that your terminal is located in the `02-orchestration/homework` directory**.
+
+## Preparations
+
+Before answering any questions, we need to both prepare our local environment and deploy the cloud resources we'll be interacting with.
+
+### Python Installations
+
+For starters, let's install the Python requirements listed in the `requirements.txt` file found in the current directory:
 ```bash
-terraform init
+pip install -r requirements.txt
 ```
 
-followed by
-```bash
-terraform apply
-```
+### Deploy Cloud Resources
 
-should set up the GCS Bucket and BigQuery database we need. 
+Next, we need to deploy a Google Cloud Storage (GCS) Bucket and a BigQuery table. We'll achieve this by using essentially the same Terraform code that we used in the Week 1 homework; this code is found in the `02-orchestration/terraform` directory:
+```bash
+cd terraform && \
+terraform init && \
+terraform apply && \
+cd ..
+```
+Upon inspecting `main.tf` and `variables.tf` in the `terraform` directory, we'll see that:
+1. The GCS Bucket we've deployed is called `zoomcamp_data_lake_$ID`, where `$ID` denotes the name of your GCP Project ID; in my case, this is `clear-nebula-375807`, so my GCS Bucket is called `zoomcamp_data_lake_clear-nebula-375807`.
+1. The BigQuery database we've created is called `taxi_data`.
+
+As we'll soon see, we'll need the names of these cloud resources when we run our Prefect flows.
+
+### Create Prefect Blocks
+
+In order for Prefect to easily interface with the cloud resources we've just created, we'll need to create Prefect blocks corresponding to these resources. With this in mind, the `blocks` subdirectory contains `gcp_cred.py` and `gcs_bucket.py`, which create a GCP Credentials Block (required for Prefect to authenticate its connection to our GCP resources) and a GCS Bucket block respectively; we won't create a BigQuery block here, since we'll be using `pandas-gbq` (which is listed in `requirements.txt`) to write to our BigQuery database rather than Prefect. The code inside `gcp_cred.py` and `gcs_bucket.py` is pretty simple, so we won't be analysing it here.
+
+We can now go ahead and create our GCP Credentials block by running:
+```bash
+gcp_creds_path="/home/mabilton/clear-nebula-375807-143b9f4e2461.json" && \
+cd blocks && \
+python3 -m gcp_cred \
+--credentials=$gcp_creds_path \
+--block_name='gcp-cred-zoomcamp' && \
+cd ..
+```
+Note that you'll need to adjust the value of the `gcp_creds_path` variable to point the GCP credentials JSON for your particular project. After this code has run, we'll have a Prefect GCP Credentials block called `gcp-cred-zoomcamp`. After this, we can create our GCS Bucket block by running:
+```bash
+bucket_name='zoomcamp_data_lake_clear-nebula-375807' && \
+cd blocks && \
+python3 -m gcs_bucket \
+--bucket=$bucket_name \
+--cred_block='gcp-cred-zoomcamp' \
+--block_name='gcs-bucket-zoomcamp' && \
+cd ..
+```
+Once again, you'll need to adjust the value of the `bucket_name` variable to match the name of the GCS Bucket that you've deployed; here, we've set it to `zoomcamp_data_lake_clear-nebula-375807`, which matches the name of the bucket deployed by Terraform for my particular project. After running this code, we should now have a Prefect GCS Bucket block called `gcs-bucket-zoomcamp`.
+
+To check that we've successfully created these blocks, we can run:
+```bash
+prefect blocks ls
+```
+This should prints something that looks like:
+```
+                                                       Blocks                                                       
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ID                                   ┃ Type            ┃ Name                ┃ Slug                              ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 192a23d7-2c1a-412f-be43-f516c8226cf8 │ GCP Credentials │ gcp-cred-zoomcamp   │ gcp-credentials/gcp-cred-zoomcamp │
+│ 470e9553-ad6c-4841-8d71-39604ba9c8b8 │ GCS Bucket      │ gcs-bucket-zoomcamp │ gcs-bucket/gcs-bucket-zoomcamp    │
+└──────────────────────────────────────┴─────────────────┴─────────────────────┴───────────────────────────────────┘
+```
+As expected, we can see both the GCP Credentials and GCS Bucket block that we've created. 
+
+At this point, we've completed all of the necessary preparations to answer Questions 1 - 4.
 
 ## Question 1
 
 ### Question
 
+Using [`etl_web_to_gcs.py` as a template](https://github.com/discdiver/prefect-zoomcamp/blob/main/flows/02_gcp/etl_web_to_gcs.py), create a Prefect flow that pulls Taxi data from the `DataTalksClub/nyc-tlc-data` repository, and then uploads this data into a Google Cloud Storage (GCS) Bucket as a [Parquet file](https://en.wikipedia.org/wiki/Apache_Parquet). The flow should accept a taxi colour, a year, and a list of months as inputs (i.e. the flow should be able to pull multiple months worth of data for a specific year and taxi colour if requested). Include a `print` statement in the flow that indicates how many rows the flow has processed.
+
+Run this flow to pull Green taxi data for January 2020; how many rows does this dataset have?
+
 ### Answer
 
-```bash
-17:24:41.393 | INFO    | prefect.engine - Created flow run 'smoky-pig' for flow 'etl-web-to-gcs'
-17:24:41.562 | INFO    | Flow run 'smoky-pig' - Created task run 'fetch-0' for task 'fetch'
-17:24:41.563 | INFO    | Flow run 'smoky-pig' - Executing 'fetch-0' immediately...
-/home/mabilton/Documents/Notes/data-engineering-zoomcamp-2023/02-orchestration/homework/etl_to_gcs.py:10: DtypeWarning: Columns (3) have mixed types. Specify dtype option on import or set low_memory=False.
-  df = pd.read_csv(dataset_url)
-17:24:43.054 | INFO    | Task run 'fetch-0' - Finished in state Completed()
-17:24:43.089 | INFO    | Flow run 'smoky-pig' - Created task run 'clean-0' for task 'clean'
-17:24:43.090 | INFO    | Flow run 'smoky-pig' - Executing 'clean-0' immediately...
-17:24:43.298 | INFO    | Task run 'clean-0' -    VendorID lpep_pickup_datetime lpep_dropoff_datetime store_and_fwd_flag  ...  total_amount  payment_type  trip_type  congestion_surcharge
-0       2.0  2019-12-18 15:52:30   2019-12-18 15:54:39                  N  ...          4.81           1.0        1.0                   0.0
-1       2.0  2020-01-01 00:45:58   2020-01-01 00:56:39                  N  ...         24.36           1.0        2.0                   0.0
 
-[2 rows x 20 columns]
-17:24:43.299 | INFO    | Task run 'clean-0' - columns: VendorID                        float64
-lpep_pickup_datetime     datetime64[ns]
-lpep_dropoff_datetime    datetime64[ns]
-store_and_fwd_flag               object
-RatecodeID                      float64
-PULocationID                      int64
-DOLocationID                      int64
-passenger_count                 float64
-trip_distance                   float64
-fare_amount                     float64
-extra                           float64
-mta_tax                         float64
-tip_amount                      float64
-tolls_amount                    float64
-ehail_fee                       float64
-improvement_surcharge           float64
-total_amount                    float64
-payment_type                    float64
-trip_type                       float64
-congestion_surcharge            float64
-dtype: object
-17:24:43.300 | INFO    | Task run 'clean-0' - rows: 447770
-17:24:43.323 | INFO    | Task run 'clean-0' - Finished in state Completed()
-17:24:43.347 | INFO    | Flow run 'smoky-pig' - Created task run 'write_local-0' for task 'write_local'
-17:24:43.348 | INFO    | Flow run 'smoky-pig' - Executing 'write_local-0' immediately...
-17:24:44.353 | INFO    | Task run 'write_local-0' - Finished in state Completed()
-17:24:44.390 | INFO    | Flow run 'smoky-pig' - Created task run 'write_gcs-0' for task 'write_gcs'
-17:24:44.391 | INFO    | Flow run 'smoky-pig' - Executing 'write_gcs-0' immediately...
-17:24:44.555 | INFO    | Task run 'write_gcs-0' - Getting bucket 'zoomcamp_data_lake_clear-nebula-375807'.
-17:24:45.313 | INFO    | Task run 'write_gcs-0' - Uploading from PosixPath('data/green/green_tripdata_2020-01.parquet') to the bucket 'zoomcamp_data_lake_clear-nebula-375807' path 'data/green/green_tripdata_2020-01.parquet'.
-17:24:46.245 | INFO    | Task run 'write_gcs-0' - Finished in state Completed()
-17:24:46.286 | INFO    | Flow run 'smoky-pig' - Finished in state Completed('All states completed.')
+A modified version of `etl_web_to_gcs.py` can be found in the `flows` subdirectory; the code itself should be relatively easy to follow and is decently documented, so we won't go over it here. Notably, the flow defined in this file utilises the GCS Bucket block we previously created.
+
+Let's now run this flow to pull the Green taxi data for January 2020 and upload it to our deployed GCS bucket:
+```bash
+cd flows && \
+python3 -m etl_web_to_gcs \
+--color='green' \
+--months=1 \
+--year=2020 \
+--save_dir='data' \
+--bucket_block='gcs-bucket-zoomcamp' && \
+cd ..
 ```
+Note here that we've specified the name of our GCS Bucket block (i.e. `'gcs-bucket-zoomcamp'`); this block is loaded within the main flow inside of `etl_web_to_gcs` and provides an easy-to-use interface between our Python code and our bucket.
+
+After running this code, the taxi data we've specified should be uploaded to our GCS Bucket. We can check that this is, indeed, the case by inspecting the contents of our bucket inside of the GCP console:
+
+![Green taxi data uploaded to our GCS Bucket](screenshots/q1-gcs-bucket.png)
+
+Additionally, we should find a line inside of the logs printed to our terminal that looks something like the following:
+```bash
+17:24:43.300 | INFO    | Task run 'clean-0' - rows: 447770
+```
+i.e. **447770 rows** of data was processed by our Prefect flow here.
 
 ## Question 2
 
 ### Question
 
+[`cron`](https://en.wikipedia.org/wiki/Cron) is a very commonly used *job scheduling* tool (i.e. a piece of software that automatically runs a specified program at a particular time). 
+
+Using the flow you previously created in Question 1, create a Prefect deployment that uses `cron` to automatically execute on the first of every month at 5am UTC. What `cron` schedule should be specified to achieve this behaviour?
+
 ### Answer
 
-Cron uses the following syntax to specify times for scheduled events:
-```bash
+Simplistically, the syntax that `cron` uses to specify times for scheduled jobs consists of five fields:
+```
 MIN HR DAY MON WK 
 ```
-where:
-- `MON` is either an int, or `*`, which specify that the scheduled operation should be run every month.
+Here, `MIN`, `HR`, `DAY`, `MON`, and `WK` denote the minute, hour, day, month, and week day (i.e. Monday to Sunday) the specified job should be performed, respectively. Each of these fields can either be set to: 
+- An integer, which indicates that the scheduled job should only be performed for times that match the value of this field. For example, if the `HR` column is `14`, then the scheduled job will only be performed at times when the hour is 2 PM (i.e. `14` o'clock). As another example, if the `WK` field is `5`, the job must be performed on a Friday, since this is the `5`th day of the week.
+- A *wildcard operator* (i.e. `*`), which indicates that the scheduled job should be performed for every value of this field. For example, if the `HR` field is a `*`, then the job should be performed every hour, **assuming** that the time also matches all the other fields. 
+
+As a simple example, consider the following `cron` schedule:
+```
+22 * * * 3
+```
+This particular `cron` schedule indicates that a job should be run on the `22`nd minute of every hour (i.e. `HR` is `*`), on every day of the month (i.e. `DAY` is `*`), every month (i.e. `MON` is `*`), but only on Wednesdays (i.e. the `3`rd day of the week). 
 
 
-With this in mind, the `cron` syntax we should use to run a scheduled job on the first day of every month at 5 AM is:
+With all this in mind, the `cron` schedule we should use to run a Prefect flow on the first day of every month at 5 AM is:
 ```
 0 5 1 * *
 ```
-Let's break this down:
-- The first `0` specifies that the 
-- The `5` specified
--
-- The next two `*` wildcards specify that should occur for any week and any month.
+i.e. we should run the job on the `0`th minute of the `5`th hour (i.e. 5 AM) of the `1`st day of every month (i.e. `MON` is `*`), no matter what day of the week it is (i.e. `WK` is `*`).
 
-To create a deployment that runs `etl_to_gcs.py` using this `cron`, we can use the CLI:
+Now that we know what `cron` schedule to specify, we can create a Prefect deployment that automatically runs the main `etl_web_to_gcs` flow in `etl_to_web_gcs.py` at 5 AM on the first day of every month by calling:
 ```bash
-prefect deployment build etl_to_gcs.py:etl_web_to_gcs -n etl_gcs_flow --cron "0 5 1 * *" -a
+prefect deployment build \
+-n etl_gcs_flow \
+--cron "0 5 1 * *" \
+--apply flows/etl_web_to_gcs.py:etl_web_to_gcs 
 ```
+Here, we've named our deployment `etl_gcs_flow` and specified our `cron` schedule using the `--cron` flag. 
+
+Just to double-check that we've correctly scheduled this flow, we can inspect the flow we've created in the Prefect Orion CLI. To do this, open another terminal instance and start an Orion UI server by running:
+```bash
+prefect orion start
+```
+After opening the link printed to the terminal, you should see a dashboard; click on the 'Deployments' tab on the left-hand side of the screen. You should see the `etl_gcs_flow` deployment we've just defined; importantly, Prefect will note that this deployment is scheduled to run automatically at 5 AM on the first of every month, as expected:
+
+![Prefect Orion Dashboard](screenshots/q2-cron-schedule.png)
+
+Return to the terminal instance you were previously in, but **keep the terminal instance running the Prefect Orion server open** - we'll be inspecting what's show in the UI in later questions.
 
 ## Question 3
 
 ### Question
 
+Using [`etl_gcs_to_bq.py` as a template](hhttps://github.com/discdiver/prefect-zoomcamp/blob/main/flows/02_gcp/etl_gcs_to_bq.py), write a Prefect flow that pulls Taxi data Parquet files from a GCS bucket (like the Parquet files we uploaded to our GCS Bucket using the Prefect flow in Question 1), and uploads this data to a BigQuery database. Importantly, this Prefect flow should:
+1. **Not** fill or remove rows with missing values. Additionally, the main flow should print the total number of rows processed by the script. 
+1. Accept a list of months, a year, and a taxi colour as input parameters, just like the flow your wrote for Question 1.
+1. Append data entries to the end of a BigQuery table if that table already exists in the database.
+
+Once this flow is written, create a Prefect deployment that runs on your local machine and that uses the flow code that is locally stored on that same machine.
+
+Run this deployment to pull the yellow taxi parquet data files for February 2019 **and** March 2019 from the GCS Bucket and subsequently upload these files to the BigQuery database. How many rows does your flow code process?
+
 ### Answer
 
-Need to upload Yellow taxi data for Feb. 2019 and March 2019 to GCS using `etl_to_gcs.py`. As a simple way to do this without creating
-any additional deployments, we can run from the commandline:
+
+A modified version of `etl_gcs_to_bq.py` can be found in the `flows` subdirectory; since the code itself is relatively easy to understand, we won't analyse the code here. We will note, however, that the flow defined in this file utilises the GCP Credentials block we previously created; this is used in conjunction with `pandas-gbq` to write to our deployed BigQuery table.
+
+Before using the flow in `etl_gcs_to_bq.py` to upload the taxi yellow taxi data for February 2019 and March 2019 to our BigQuery database, we first have to use our flow in `etl_web_to_gcs.py` to upload these datasets to our GCS bucket; once in our bucket, we can transfer them over to BigQuery. 
+
+With this in mind, let's first upload the yellow taxi data for February 2019 and March 2019 to our bucket by executing the following command:
 ```bash
-python3 -c 'from etl_to_gcs import etl_web_to_gcs; etl_web_to_gcs(color="yellow", year=2019, months=[2, 3])'
+cd flows && \
+python3 -m etl_web_to_gcs \
+--color='yellow' \
+--months=[2,3] \
+--year=2019 \
+--save_dir='data' \
+--bucket_block='gcs-bucket-zoomcamp' && \
+cd ..
 ```
+Note that this will take substantially longer than the command we ran in Question 1, since the yellow taxi datasets are substantially larger than the green taxi ones; more specifically, expect this command to take three or so minutes to run.
 
-Please note that the Yellow Taxi datasets are substatially larger than the Green taxi datasets, so this will take noticably longer than our previous execution of the `etl_web_to_gcs` flow. 
-
-Once this is successfully completed, we can create a deployment:
-
+Once this data is successfully stored in our GCS bucket, let's create a deployment for our `etl_gcs_to_bq` flow:
 ```bash
-prefect deployment build etl_to_bq.py:etl_gcs_to_bq -n etl_bq_flow -a
+prefect deployment build \
+-n etl_bq_flow \
+--apply flows/etl_gcs_to_bq.py:etl_gcs_to_bq  
 ```
+Upon executing this command, we should see something like the following printed to our terminal:
+```bash
+Deployment 'etl-gcs-to-bq/etl_bq_flow' successfully created with id '2d47c586-8d66-4dd8-82a6-e54e67d8c4b9'.
+```
+i.e. we can refer to this deployment using `etl-gcs-to-bq/etl_bq_flow`. This human-readable string that we can use to uniquely identify our deployment is referred to as a [*slug*](https://itnext.io/whats-a-slug-f7e74b6c23e0).
 
+To run our newly-created deployment, we can use `prefect deployment run` and pass in our desired parameters:
+```bash
+gcp_project_id="clear-nebula-375807" && \
+prefect deployment run \
+--param color="yellow" \
+--param year=2019 \
+--param months=[2,3] \
+--param bucket_block='gcs-bucket-zoomcamp' \
+--param gcs_dir='data' \
+--param cred_block='gcp-cred-zoomcamp' \
+--param bq_db_name='taxi_data' \
+--param bq_table_name='rides' \
+--param project_id=$gcp_project_id \
+--param save_dir='' \
+etl-gcs-to-bq/etl_bq_flow
+```
+There are two things to note about this command:
+1. If running this for yourself, you'll obviously need to set the `gcp_project_id` variable so that it matches the name of our GCP project ID.
+1. We've specified that our flow should write to the `rides` table inside of the `taxi_data` BigQuery database; note that `taxi_data` is the name given by Terraform to our deployed BigQuery databsae, whereas `rides` is the name of the table we'd like our flow to create (if it doesn't already exist) or append to (if it already exists).
+
+Executing this command won't begin our flow, however; it merely adds it to the `default` queue of tasks that Prefect should perform. Indeed, after we created the `etl-gcs-to-bq/etl_bq_flow` deployment, Prefect notified us in the terminal that:
+```bash
+To execute flow runs from this deployment, start an agent that pulls work from the 'default' work queue:
+$ prefect agent start -q 'default'
+```
+Let's follow Prefect's advice and create an agent to execute flow runs from the `default` queue:
 ```bash
 prefect agent start -q 'default'
 ```
+After waiting for a moment, our deployed agent should start executing our job. We can visually monitor the progress of this job by inside of the Orion UI we opened up in the previous question; we should see something like this: 
+![`etl-gcs-to-bq/etl_bq_flow` deployment monitored inside of Prefect Orion UI](screenshots/q3-bq-flow-in-orion.png)
 
-To execute this deployment, we can run:
-```
-prefect deployment run --param color="yellow" --param year=2019 --param months=[2,3] etl-gcs-to-bq/etl_bq_flow
-```
-
-Upon inspecting the logs for this deployment (either through the CLI or the Orion UI), we should see the following output printed near the very end:
+Once our flow has finished running, we can inspect the logs for this flow run (either through the CLI or the Orion UI); near the very end of the logs, we should see:
 ```bash
-Total number of rows processed = 14851920
+00:26:39.616 | INFO    | Flow run 'dramatic-pig' - Total number of rows processed = 14851920
 ```
+i.e. our flow run processed **14851920 rows** of data. 
+
+We should also double-check that the Prefect flow actually uploaded our data to the `rides` table in our Big Query database; this can be done through the GCP console:
+![Yellow Taxi datasets uploaded to our deployed BigQuery database](screenshots/q3-bq-in-gcp-console.png)
 
 ## Question 4
 
 ### Question
 
+Create a GitHub storage block and use it to create a Prefect deployment that utilises the `etl_web_to_gcs.py` flow code *hosted on Github*, rather than using the `etl_web_to_gcs.py` flow code that's available on your local machine. 
+
+Run the deployment on your local machine to upload the Green taxi data for November 2020 to your GCS Bucket; how many rows are processed by the flow code?
+
+*Hint*: You will need to push the `etl_web_to_gcs.py` flow code to Github *before* running the deployment.
+
 ### Answer
 
+To create a Github storage block that 'points' to the repository of our Data Engineering Zoomcamp repository, we can use the `blocks/github.py` script like so:
+```bash
+repo_url="https://github.com/mabilton/data-engineering-zoomcamp-2023" && \
+cd blocks && \
+python3 -m github \
+--repo=$repo_url \
+--block_name='gh-zoomcamp' && \
+cd ..
+```
+Here, we've specified the name of this block to be `gh-zoomcamp`. Note that if you'd like to create a Github block that points to your own respository, you'll obviously need to alter the `repo_url` variable accordingly. We can check that this block has been successfully created by once again running `prefect blocks ls`:
+```
+                                                       Blocks                                                       
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ID                                   ┃ Type            ┃ Name                ┃ Slug                              ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ a052e1b4-51ed-4228-9012-86fd312a555e │ GCP Credentials │ gcp-cred-zoomcamp   │ gcp-credentials/gcp-cred-zoomcamp │
+│ 276dd893-6da7-4358-b7b2-0fc008aea9f5 │ GCS Bucket      │ gcs-bucket-zoomcamp │ gcs-bucket/gcs-bucket-zoomcamp    │
+│ 65e849ac-9be0-4b22-952a-18e1a46c6e50 │ GitHub          │ gh-zoomcamp         │ github/gh-zoomcamp                │
+└──────────────────────────────────────┴─────────────────┴─────────────────────┴───────────────────────────────────┘
+```
+As can be seen, we now have three Prefect blocks available for use.
+
+To create a Prefect deployment that uses the version of the `etl_web_to_gcs` flow stored in the Github repository our `gh-zoomcamp` block is pointing to (as opposed to the `etl_web_to_gcs` that's stored on our local machine), we execute the command:
+```
+cd ../.. && \
+prefect deployment build \
+-n github-etl \
+-sb github/gh-zoomcamp \
+--apply 02-orchestration/homework/flows/etl_web_to_gcs.py:etl_web_to_gcs && \
+cd 02-orchestration/homework
+```
+There are a couple of important points to note about this command:
+1. We've used the `-sb` flag (short for 'Storage block') to specify that the `etl_web_to_gcs.py` flow code should be pulled from Github by using the `github` block called `gh-zoomcamp`.
+1. As of February 6 2023, Prefect doesn't appear to correctly handle subdirectories when defining deployments that pull code from remote repositories. To make sure everything works, we need to define our deployment inside of the **root directory of our local `git` repository** (hence the `cd ../..` prior to running `prefect deployment build`, as well as the `cd 02-orchestration-homework` after running this command). As a consequence of this, we need to specify the exact subdirectory of the flow script we want to run inside of our Git repository. For my Data Engineering Zoomcamp notes `git` repository (i.e. the one you're looking at right now), this is `02-orchestration/homework/flows/etl_web_to_gcs.py`.
+1. Prefect **doesn't push your code to Github**: in order for this flow to work, therefore, it is assumed that the flow code is already pushed to the `main`/`master` branch of your Github repository.
+
+Once this command has successfully run, we should see a message like the following:
+```bash
+Deployment 'etl-web-to-gcs/github-etl' successfully created with id '498e7c03-3724-45d5-82fb-1ae98cba1e85'.
+```
+i.e. we can use the slug `etl-web-to-gcs/github-etl` to refect to our newly created deployment. 
+
+We can now run this deployment to upload the green taxi November 2020 data by executing:
+```bash
+prefect deployment run \
+--param color="green" \
+--param year=2020 \
+--param months=11 \
+--param save_dir='data' \
+--param bucket_block='gcs-bucket-zoomcamp' \
+etl-web-to-gcs/github-etl
+```
+and then by starting up a Prefect agent:
+```
+prefect agent start -q 'default'
+```
+
+To make sure this flow is actually running using the Github code, we can delete `` and re-run the above deployment; we should see that this still works.
+
+Upon inspecting the logs, we see that:
+```
+00:38:31.064 | INFO    | Flow run 'mellow-tench' - Total number of rows processed = 88605
+```
+
+## Question 5
+
+### Question
+
+
+### Answer
+
+First login:
+```
+prefect cloud login
+```
+Now that we're logged in, need to recreate all the blocks and deployments we were previously using; for convenience, we reproduce the code to create these blocks here:
+- Github block: 
+    ```bash
+    cd blocks && \
+    python3 -m github \
+    --repo=https://github.com/mabilton/data-engineering-zoomcamp-2023 \
+    --block_name='gh-zoomcamp' && \
+    cd ..
+    ```
+- GCP Credentials block:
+    ```bash
+    gcp_creds_path="/home/mabilton/clear-nebula-375807-143b9f4e2461.json" && \
+    cd blocks && \
+    python3 -m gcp_cred \
+    --credentials=$gcp_creds_path \
+    --block_name='gcp-cred-zoomcamp' && \
+    cd ..
+    ```
+- GCS Bucket block:
+    ```bash
+    bucket_name='zoomcamp_data_lake_clear-nebula-375807' && \
+    cd blocks && \
+    python3 -m gcs_bucket \
+    --bucket=$bucket_name \
+    --cred_block='gcp-cred-zoomcamp' \
+    --block_name='gcs-bucket-zoomcamp' && \
+    cd ..
+    ```
+- Github ETL deployment:
+    ```bash
+    cd ../.. && \
+    prefect deployment build \
+    -n github-etl \
+    -sb github/gh-zoomcamp \
+    --apply 02-orchestration/homework/flows/etl_web_to_gcs.py:etl_web_to_gcs && \
+    cd 02-orchestration/homework
+    ```
+
+We can see these blocks and deployments have been created on our online workspace:
+TODO
+
+Run Q4 script for Green taxi data in April 2019:
+```bash
+prefect deployment run \
+--param color="green" \
+--param year=2019 \
+--param months=4 \
+--param save_dir='data' \
+--param bucket_block='gcs-bucket-zoomcamp' \
+etl-web-to-gcs/github-etl
+```
+Start agent:
+```bash
+prefect agent start -q 'default'
+```
+In the logs of our agent, we should see the output:
+```bash
+09:57:01.144 | INFO    | Flow run 'smooth-spoonbill' - Total number of rows processed = 514392
+```
+
+## Question 6
+
+### Question
+
+### Answer
+
+There are 8 astrices.
 
 
 ## Cleaning Up
 
+First, we should log out of `prefect cloud` as follows:
+```bash
+prefect cloud logout
+```
 To prevent, we should make sure to shut down any using Terraform:
 ```bash
-terraform destroy
+cd terraform && \
+terraform destroy && \
+cd ..
 ```
