@@ -48,7 +48,7 @@ def write_gcs(gcs_block: str, path: Path) -> None:
     return None
 
 
-@flow()
+@flow(log_prints=True)
 def etl_web_to_gcs(
     color: str,
     year: int,
@@ -59,6 +59,7 @@ def etl_web_to_gcs(
     """The main ETL function"""
     if not isinstance(months, Sequence):
         months = [months]
+    num_rows_processed = 0
     for month in months:
         dataset_file = f"{color}_tripdata_{year}-{month:02}"
         dataset_url = (
@@ -69,6 +70,9 @@ def etl_web_to_gcs(
         df_clean = clean(df)
         path = write_local(save_dir, df_clean, color, dataset_file)
         write_gcs(gcs_block, path)
+        num_rows_processed += len(df)
+    print(f"Total number of rows processed = {num_rows_processed}")
+    return None
 
 
 if __name__ == "__main__":
@@ -94,7 +98,9 @@ if __name__ == "__main__":
             "Month(s) of data to pull and upload; more than "
             "one month can be specified."
         ),
-        type=Union[int, Sequence[int]],
+       type=lambda x: [int(val) for val in x.strip("[]").split(",")]
+        if isinstance(x, str)
+        else x,
     )
     parser.add_argument(
         "--save_dir",
