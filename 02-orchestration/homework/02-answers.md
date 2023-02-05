@@ -141,7 +141,6 @@ prefect deployment run \
 --param months=[2,3] \
 --param save_dir='data' \
 --param gcs_block='gcs-bucket-zoomcamp' \
-etl-gcs-to-bq/etl_bq_flow
 ```
 
 Upon inspecting the logs for this deployment (either through the CLI or the Orion UI), we should see the following output printed near the very end:

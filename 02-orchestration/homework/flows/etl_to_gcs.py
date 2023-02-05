@@ -98,7 +98,7 @@ if __name__ == "__main__":
             "Month(s) of data to pull and upload; more than "
             "one month can be specified."
         ),
-        type=lambda x: [int(val) for val in x.strip("[]").split(",")]
+       type=lambda x: [int(val) for val in x.strip("[]").split(",")]
         if isinstance(x, str)
         else x,
     )
