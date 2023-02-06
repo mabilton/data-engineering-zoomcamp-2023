@@ -261,14 +261,14 @@ Run the deployment on your local machine to upload the Green taxi data for Novem
 
 To create a Github storage block that 'points' to the repository of our Data Engineering Zoomcamp repository, we can use the `blocks/github.py` script like so:
 ```bash
-repo_url="https://github.com/mabilton/data-engineering-zoomcamp-2023" && \
+gh_repo_url="https://github.com/mabilton/data-engineering-zoomcamp-2023" && \
 cd blocks && \
 python3 -m github \
---repo=$repo_url \
+--repo=$gh_repo_url \
 --block_name='gh-zoomcamp' && \
 cd ..
 ```
-Here, we've specified the name of this block to be `gh-zoomcamp`. Note that if you'd like to create a Github block that points to your own respository, you'll obviously need to alter the `repo_url` variable accordingly. We can check that this block has been successfully created by once again running `prefect blocks ls`:
+Here, we've specified the name of this block to be `gh-zoomcamp`. Note that if you'd like to create a Github block that points to your own respository, you'll obviously need to alter the `gh_repo_url` variable accordingly. We can check that this block has been successfully created by once again running `prefect blocks ls`:
 ```
                                                        Blocks                                                       
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -301,7 +301,20 @@ Deployment 'etl-web-to-gcs/github-etl' successfully created with id '498e7c03-37
 ```
 i.e. we can use the slug `etl-web-to-gcs/github-etl` to refect to our newly created deployment. 
 
-We can now run this deployment to upload the green taxi November 2020 data by executing:
+
+At this point, we've now defined our third deployment; we can inspect all of the deployments we've defined thus far by running `prefect deployments ls`:
+```
+                             Deployments                              
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name                        ┃ ID                                   ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ etl-gcs-to-bq/etl_bq_flow   │ c0258427-2bd4-4c95-938c-b24a0f16fa32 │
+│ etl-web-to-gcs/etl_gcs_flow │ 912efe73-a350-4ae7-91d3-edd744442816 │
+│ etl-web-to-gcs/github-etl   │ 38671af3-5233-4cce-8ff8-06386bd2100c │
+└─────────────────────────────┴──────────────────────────────────────┘
+```
+
+Let's now run our newly-created `etl-web-to-gcs/github-etl` deployment to upload the green taxi November 2020 data by executing:
 ```bash
 prefect deployment run \
 --param color="green" \
@@ -315,68 +328,104 @@ and then by starting up a Prefect agent:
 ```
 prefect agent start -q 'default'
 ```
-Upon inspecting the logs of this flow, 
+Near the start of the logs for this flow, we should see a line that indicates that the flow code to be run has been downloaded from storage:
+```
+23:26:06.939 | INFO    | Flow run 'soft-coot' - Downloading flow code from storage at ''
+```
+To make sure this flow is actually running using flow code stored in our Github repository rather than the flow code in our local directory, we can delete `flows/etl_web_to_gcs.py` and re-run the above deployment; we should see that everything still works.
 
-To make sure this flow is actually running using the Github code, we can delete `` and re-run the above deployment; we should see that this still works.
-
-Upon inspecting the logs, we see that:
+To find out the number of rows processed by our flow, check the logs for a line which looks something like the following:
 ```
 00:38:31.064 | INFO    | Flow run 'mellow-tench' - Total number of rows processed = 88605
 ```
+i.e. our flow processed **88605 rows**.
 
 ## Question 5
 
 ### Question
 
+Connect to [Prefect Cloud](app.prefect.cloud) and create an Email notification block that automatically sends you an alert email when any flow is successfully completed. While connected to Prefect cloud, run the deployment created in Question 4 to pull the Green taxi data for April 2019 from Github and upload it into your GCS Bucket. How many rows are processed by the flow?
+
+*Hint*: Once you connect your terminal to the Prefect Cloud environment, you'll need to recreate all of the blocks and deployments you created locally during Questions 1 through to 4. This is because the Prefect cloud environment our terminal has connected to is entirely independent from the Prefect environment we've locally been running on our machine (i.e. these Prefect environments don't share any of their blocks, deployments, variables, etc. by default).
 
 ### Answer
 
-First login:
+Before connecting our terminal to Prefect Cloud, we first need to create an account at [app.prefect.cloud](app.prefect.cloud); if you have a Google account, you can just use that instead. Once you've created an account and logged into [app.prefect.cloud](app.prefect.cloud) using a web browser, you'll need to create a new workspace for our terminal to connect to; this is easily done by following the on-screen instructions.
+
+Once this is done, we can connect our terminal to a Prefect Cloud instance by running:
 ```
 prefect cloud login
 ```
-Now that we're logged in, need to recreate all the blocks and deployments we were previously using; for convenience, we reproduce the code to create these blocks here:
-- Github block: 
-    ```bash
-    cd blocks && \
-    python3 -m github \
-    --repo=https://github.com/mabilton/data-engineering-zoomcamp-2023 \
-    --block_name='gh-zoomcamp' && \
-    cd ..
-    ```
-- GCP Credentials block:
-    ```bash
-    gcp_creds_path="/home/mabilton/clear-nebula-375807-143b9f4e2461.json" && \
-    cd blocks && \
-    python3 -m gcp_cred \
-    --credentials=$gcp_creds_path \
-    --block_name='gcp-cred-zoomcamp' && \
-    cd ..
-    ```
-- GCS Bucket block:
-    ```bash
-    bucket_name='zoomcamp_data_lake_clear-nebula-375807' && \
-    cd blocks && \
-    python3 -m gcs_bucket \
-    --bucket=$bucket_name \
-    --cred_block='gcp-cred-zoomcamp' \
-    --block_name='gcs-bucket-zoomcamp' && \
-    cd ..
-    ```
-- Github ETL deployment:
-    ```bash
-    cd ../.. && \
-    prefect deployment build \
-    -n github-etl \
-    -sb github/gh-zoomcamp \
-    --apply 02-orchestration/homework/flows/etl_web_to_gcs.py:etl_web_to_gcs && \
-    cd 02-orchestration/homework
-    ```
+Upon running this, we can authenticate our terminal by logging in to Prefect Cloud with our web browser - just follow the instructions printed to the terminal.
 
-We can see these blocks and deployments have been created on our online workspace:
-TODO
+Now that we're logged in, we'll need to recreate all the blocks and deployments we were previously using, since these were all created in our local environment and, therefore, don't exist in the cloud. To confirm that this is, in fact, the case, we can run `prefect blocks ls`, which should print an empty table:
+```
+          Blocks           
+┏━━━━┳━━━━━━┳━━━━━━┳━━━━━━┓
+┃ ID ┃ Type ┃ Name ┃ Slug ┃
+┡━━━━╇━━━━━━╇━━━━━━╇━━━━━━┩
+└────┴──────┴──────┴──────┘
+```
+as well as `prefect deployments ls`, which will also print an empty table:
+```
+ Deployments 
+┏━━━━━━┳━━━━┓
+┃ Name ┃ ID ┃
+┡━━━━━━╇━━━━┩
+└──────┴────┘
+```
 
-Run Q4 script for Green taxi data in April 2019:
+To quickly redefine all of the blocks and deployments we'll need to answer Question 5, you can copy and paste the following code to your terimnal (just be sure to change the values of variables to fit your deployment configuration):
+```bash
+# Define variables (redefine these appropriately if needed):
+gcp_creds_path="/home/mabilton/clear-nebula-375807-143b9f4e2461.json" && \
+gh_repo_url="https://github.com/mabilton/data-engineering-zoomcamp-2023" && \
+bucket_name='zoomcamp_data_lake_clear-nebula-375807' && \
+# Create GCP credentials block:
+cd blocks && \
+python3 -m gcp_cred \
+--credentials=$gcp_creds_path \
+--block_name='gcp-cred-zoomcamp' && \
+cd .. && \
+# Create GCS Bucket block:
+cd blocks && \
+python3 -m gcs_bucket \
+--bucket=$bucket_name \
+--cred_block='gcp-cred-zoomcamp' \
+--block_name='gcs-bucket-zoomcamp' && \
+cd .. && \
+# Create Github block:
+cd blocks && \
+python3 -m github \
+--repo=$gh_repo_url \
+--block_name='gh-zoomcamp' && \
+cd .. && \
+# Create deployment that pulls `etl_web_to_gcs` from Github repo:
+cd ../.. && \
+prefect deployment build \
+-n github-etl \
+-sb github/gh-zoomcamp \
+--apply 02-orchestration/homework/flows/etl_web_to_gcs.py:etl_web_to_gcs && \
+cd 02-orchestration/homework
+```
+
+Now that we've redefined all our blocks and our `github-etl` deployment, we need to set-up an email notification on Prefect Cloud to alert us when this flow has completed. This is done as follows:
+1. Click on the 'Blocks' Tab on the left-hand side of the Prefect Cloud UI, and then click the '+' button next to the 'Blocks' page title:
+![Creating a block in Prefect Cloud](screenshots/q5-email-step-0.png)
+1. Search for the 'Email' block and click 'Add +':
+![Creating an Email block in Prefect Cloud](screenshots/q5-email-step-1.png)
+1. Give the block a name and a list of emails to send notifications to, and then click 'Create':
+![Specifying Email block name and email list](screenshots/q5-email-step-2.png)
+1. Click on the 'Automations' Tab on the left-hand side of the Prefect Cloud UI (just below the 'Blocks' tab), and then click the 'Add Automation +' button:
+1. Set the 'Trigger Type' to 'Flow Run State'; this should open up more options. In the last row of options, specify that a notification should be sent when a Flow Run 'Enters' a 'Completed' state. Then click Next:
+![Creating an automation in Prefect Cloud](screenshots/q5-email-step-3.png)
+1. Set the 'Action Type' to 'Send a Notification'; this will open up more options. Select the Email block we just created from the 'Block' drop-down menu and click Next:
+![Configuring Automation behaviour](screenshots/q5-email-step-4.png)
+1. Give the automation a name and click Create; automatic emails should now be sent whenever a flow on Prefect Cloud successfully completes:
+![Created email automation block](screenshots/q5-email-step-5.png)
+
+
+Now that we've set up automatic email notifications, we can now run the `github-etl` deployment we've defined in Prefect Cloud to pull the green taxi data for April 2019; to do this, we execute the following command in our terminal
 ```bash
 prefect deployment run \
 --param color="green" \
@@ -386,33 +435,54 @@ prefect deployment run \
 --param bucket_block='gcs-bucket-zoomcamp' \
 etl-web-to-gcs/github-etl
 ```
-Start agent:
+Once again, we'll also need to start an agent in the `default` queue to process the flow run we just submitted:
 ```bash
 prefect agent start -q 'default'
 ```
-In the logs of our agent, we should see the output:
+We can then inspect the progress of this flow run inside of the Prefect Cloud UI:
+![Monitoring the `etl-web-to-gcs/github-etl` flow run in Prefect Cloud](screenshots/q5-monitor-flow-in-prefect-cloud.png)
+
+After the flow run has successfully completed, we should see that we've automatically been sent an email notifying us of the completion of this flow run:
+![Email notification sent by Prefect Cloud](screenshots/q5-email-notification.png)
+
+Once our flow has run successfully, we should see within the logs of our agent that:
 ```bash
 09:57:01.144 | INFO    | Flow run 'smooth-spoonbill' - Total number of rows processed = 514392
 ```
+i.e. **514392 rows** were processed by our flow code.
 
 ## Question 6
 
 ### Question
 
+In Prefect, Secret blocks are used to securely store values that should be kept secret (e.g. access keys). Create a secret block in the UI (either locally or in the cloud) that stores a fake 10-digit password. Once you’ve created your block, check how this 'password' is displayed when the block is clicked on. In particular, how many characters of this 10 character password are shown as asterisks (*)?
+
 ### Answer
 
-There are 8 astrices.
+To create a Secret block in Prefect Cloud, we perform the following steps:
+1. Click on the 'Blocks' tab on the left-hand side of the UI, and then click the '+' Button next to the Title of the 'Blocks' page:
+![Creating a block in Prefect Cloud](screenshots/q6-secret-step-0.png)
+1. Search for the 'Secret' block and click 'Add +':
+![Creating a Secret block in Prefect Cloud](screenshots/q6-secret-step-1.png)
+1. Give the block a name and specify the string you'd like the block to securely store. For the purposes of answering this question, we'll store the 10-character string value `0123456789`. Click Create.
+![Creating a Secret block in Prefect Cloud](screenshots/q6-secret-step-2.png)
+1. We should now see our created Secret block:
+![Creating a Secret block in Prefect Cloud](screenshots/q6-secret-step-3.png)
 
+Looking at the last screenshot in the above series of steps, we see that **eight asterisks** are displayed to represent the ten-character string we've stored.
 
 ## Cleaning Up
 
-First, we should log out of `prefect cloud` as follows:
+Now that we've answered all of the questions for this week's homework, we should shut-down all the cloud resources we've utilised to prevent being billed for using these resources.
+
+First, we should log out of `prefect cloud`:
 ```bash
 prefect cloud logout
 ```
-To prevent, we should make sure to shut down any using Terraform:
+After this, we should use Terraform to `destroy` the resources we've deployed to Google Cloud:
 ```bash
 cd terraform && \
 terraform destroy && \
 cd ..
 ```
+Note that you may recieve an error when attempting the delete the BigQuery database if it's 'In Use'; if this happens, you may have to delete the database manually inside of the GCP Console UI.
