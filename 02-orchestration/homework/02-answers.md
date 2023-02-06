@@ -315,6 +315,7 @@ and then by starting up a Prefect agent:
 ```
 prefect agent start -q 'default'
 ```
+Upon inspecting the logs of this flow, 
 
 To make sure this flow is actually running using the Github code, we can delete `` and re-run the above deployment; we should see that this still works.
 
