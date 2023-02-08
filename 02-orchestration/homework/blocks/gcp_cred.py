@@ -4,10 +4,12 @@ import json
 from prefect_gcp import GcpCredentials
 
 
-def create_gcp_credentials_block(credentials: str, block_name: str) -> None:
+def create_gcp_credentials_block(
+    credentials: str, block_name: str, overwrite: bool
+) -> None:
     with open(credentials) as f:
         creds = json.load(f)
-    GcpCredentials(service_account_info=creds).save(block_name)
+    GcpCredentials(service_account_info=creds).save(block_name, overwrite=overwrite)
     return None
 
 
@@ -23,6 +25,16 @@ if __name__ == "__main__":
         required=True,
         help="Name to give to created GCP credentials block.",
         type=str,
+    )
+    parser.add_argument(
+        "--overwrite",
+        required=False,
+        default=False,
+        help=(
+            "Whether block should be overwritten if "
+            "it already exists (default: False)."
+        ),
+        type=bool,
     )
     args_dict = vars(parser.parse_args())
     create_gcp_credentials_block(**args_dict)
