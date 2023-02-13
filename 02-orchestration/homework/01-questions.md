@@ -1,6 +1,6 @@
 # Week 2 Homework Questions
 
-This file lists the homework questions for Week 1 for the 2023 cohort of the Data Engineering Zoomcamp; please refer to `02-answers.md` within this subdirectory for the answers to each question.
+This file lists the homework questions for Week 2 for the 2023 cohort of the Data Engineering Zoomcamp; please refer to `02-answers.md` within this subdirectory for the answers to each question.
 
 There are two points to note before reading these questions:
 1. The Taxi data referenced in the questions refers to the CSV files hosted by `DataTalksClub` at the [`DataTalksClub/nyc-tlc-data` GitHub repository](https://github.com/DataTalksClub/nyc-tlc-data).

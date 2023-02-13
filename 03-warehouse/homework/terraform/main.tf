@@ -17,7 +17,7 @@ provider "google" {
 # Data Lake Bucket
 # Ref: https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket
 resource "google_storage_bucket" "data-lake-bucket" {
-  name          = "${local.data_lake_bucket}_${var.project}" # Concatenating DL bucket & Project name for unique naming
+  name          = "zoomcamp_data_lake" # Concatenating DL bucket & Project name for unique naming
   location      = var.region
 
   # Optional, but recommended settings:
@@ -40,10 +40,10 @@ resource "google_storage_bucket" "data-lake-bucket" {
   force_destroy = true
 }
 
-# DWH
 # Ref: https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/bigquery_dataset
 resource "google_bigquery_dataset" "dataset" {
-  dataset_id = var.BQ_DATASET
+  dataset_id = "taxi_data"
   project    = var.project
   location   = var.region
+  delete_contents_on_destroy = true
 }
