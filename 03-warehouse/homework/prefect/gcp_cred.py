@@ -22,17 +22,21 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--block_name",
-        required=True,
-        help="Name to give to created GCP credentials block.",
+        required=False,
+        default="gcp-cred-zoomcamp",
+        help=(
+            "Name to give to created GCP credentials block "
+            "(default: 'gcp-cred-zoomcamp')."
+        ),
         type=str,
     )
     parser.add_argument(
         "--overwrite",
         required=False,
-        default=False,
+        default=True,
         help=(
             "Whether block should be overwritten if "
-            "it already exists (default: False)."
+            "it already exists (default: True)."
         ),
         type=bool,
     )

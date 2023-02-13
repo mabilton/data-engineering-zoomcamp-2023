@@ -19,29 +19,35 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--bucket",
-        required=True,
-        help="Name of the GCS bucket to connect to.",
+        required=False,
+        default="zoomcamp_data_lake",
+        help=("Name of the GCS bucket to connect to (default: 'fhv_tripdata')."),
         type=str,
     )
     parser.add_argument(
         "--cred_block",
-        required=True,
-        help="Name of GCP Credentials Prefect block.",
+        required=False,
+        default="gcp-cred-zoomcamp",
+        help="Name of GCP Credentials Prefect block (default: 'gcp-cred-zoomcamp').",
         type=str,
     )
     parser.add_argument(
         "--block_name",
-        required=True,
-        help="Name of give to create GCS Bucket block.",
+        required=False,
+        default="gcs-bucket-zoomcamp",
+        help=(
+            "Name of give to create GCS Bucket "
+            "block (default: 'gcs-bucket-zoomcamp')."
+        ),
         type=str,
     )
     parser.add_argument(
         "--overwrite",
         required=False,
-        default=False,
+        default=True,
         help=(
             "Whether block should be overwritten if "
-            "it already exists (default: False)."
+            "it already exists (default: True)."
         ),
         type=bool,
     )
