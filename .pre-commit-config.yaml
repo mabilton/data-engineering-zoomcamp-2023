@@ -1,4 +1,6 @@
 repos:
+  
+  # Python Linters:
 
   - repo: https://github.com/pycqa/isort
     rev: 5.10.1
@@ -24,5 +26,5 @@ repos:
         language_version: python3
         args:
           - "--max-line-length=88"
-          # Allow for lambda functions, line break before binary op:
-          - "--ignore=E731, W503"
+          # Allow for lambda functions, line break before binary op, trailing whitespace:
+          - "--ignore=E731, W503, W291"

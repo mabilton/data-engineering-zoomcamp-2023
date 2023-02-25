@@ -3,6 +3,7 @@
 *.gz*
 *.parquet
 data
+*_tripdata
 
 # Python files:
 *.ipynb_checkpoints
@@ -16,3 +17,16 @@ terraform.tfstate*
 # Prefect files:
 .prefectignore
 *-deployment.yaml
+
+# dbt files:
+**/dbt/logs
+**/dbt/*/logs
+**/dbt/target
+**/dbt/*/target
+**/dbt/dbt_modules
+**/dbt/*/dbt_modules
+**/dbt/dbt_packages
+**/dbt/*/dbt_packages
+**/dbt/*/.user*
+# Include dbt seed files which are CSVs:
+!**/dbt/*/seeds/*.csv

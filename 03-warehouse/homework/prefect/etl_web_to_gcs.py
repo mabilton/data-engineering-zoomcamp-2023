@@ -101,7 +101,7 @@ if __name__ == "__main__":
         "--bucket_block",
         required=False,
         default="gcs-bucket-zoomcamp",
-        help=("Name of GCS Bucket Prefect block " "(default: 'gcs-bucket-zoomcamp')."),
+        help=("Name of GCS Bucket Prefect block (default: 'gcs-bucket-zoomcamp')."),
         type=str,
     )
     parser.add_argument(
