@@ -3,6 +3,10 @@
 with fhv_data as (
     select *
     from {{ ref('stg_fhv_tripdata') }}
+    where
+        pickup_datetime between '2019-01-01' and '2020-12-31'
+    and
+        dropoff_datetime between '2019-01-01' and '2020-12-31'
 ),
 
 zones as (

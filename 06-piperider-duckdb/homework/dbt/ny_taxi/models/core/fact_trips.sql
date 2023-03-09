@@ -5,6 +5,10 @@ with green_data as (
         *,
         'Green' as service_type
     from {{ ref('stg_green_tripdata') }}
+    where
+        pickup_datetime between '2019-01-01' and '2020-12-31'
+    and
+        dropoff_datetime between '2019-01-01' and '2020-12-31'
 ),
 
 yellow_data as (
@@ -12,6 +16,10 @@ yellow_data as (
         *,
         'Yellow' as service_type
     from {{ ref('stg_yellow_tripdata') }}
+    where
+        pickup_datetime between '2019-01-01' and '2020-12-31'
+    and
+        dropoff_datetime between '2019-01-01' and '2020-12-31'
 ),
 
 trips_unioned as (

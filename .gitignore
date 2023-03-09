@@ -30,3 +30,7 @@ terraform.tfstate*
 **/dbt/*/.user*
 # Include dbt seed files which are CSVs:
 !**/dbt/*/seeds/*.csv
+
+# DuckDB database files:
+*.duckdb
+*.duckdb.*
