@@ -1,0 +1,5 @@
+duckdb~=0.7
+dbt-core~=1.4
+dbt-duckdb~=1.4
+piperider[duckdb]~=0.20
+wget~=3.2

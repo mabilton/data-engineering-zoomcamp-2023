@@ -20,7 +20,7 @@ trips_unioned as (
     select * from yellow_data
 ),
 
-dim_zones as (
+zones as (
     select * from {{ ref('dim_zones') }}
     where borough != 'Unknown'
 )
@@ -54,7 +54,7 @@ select
     trips_unioned.payment_type_description,
     trips_unioned.congestion_surcharge
 from trips_unioned
-inner join dim_zones as pickup_zone
+inner join zones as pickup_zone
     on trips_unioned.pickup_locationid = pickup_zone.locationid
-inner join dim_zones as dropoff_zone
+inner join zones as dropoff_zone
     on trips_unioned.dropoff_locationid = dropoff_zone.locationid

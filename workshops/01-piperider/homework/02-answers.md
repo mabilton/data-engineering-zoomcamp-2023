@@ -1,0 +1,146 @@
+# Piperider Workshop Homework Answers
+
+This file contains my answers to the Piperider workshop homework questions for the 2023 cohort of the Data Engineering Zoomcamp. For convenience, each question is restated before giving the corresponding answer; the list of questions *without* corresponding answers can be found in `01-questions.md`, which can be found in the current directory.
+
+Please note that all of the intructions provided here **assume that your terminal is located in the `workshops/01-piperider/homework` directory**. 
+
+## Set-Up
+
+### Question
+
+To run this homework, you'll need to install `dbt`, `duckdb`, and `piperider`; you can easily install all of these requirements with the help of the `requirements.txt` file in this homework directory:
+```bash
+pip install -r requirements.txt
+```
+
+Next, you'll need to download the same set of CSV files we used for the Week 4 homework; these CSV files consisted of:
+1. The Yellow Taxi trip data for 2019 **and** 2020, which can be found here.
+1. The Green Taxi trip data for 2019 **and** 2020, which can be found here.
+1. The FHV Taxi trip data for 2019, which can be found here.
+Once downloaded, these files should be ingested into your `duckdb` database. For more information on how to ingest data into a `duckdb` database, please refer to the `duckdb` documentation.
+
+After this, you should copy over the Week 4 homework `dbt` project, since we'll be 'building off' of this code. Before running this project, you'll need to make two modifications:
+1. Modify the `profiles.yml` file so that the `dbt` project is correctly configured to work with a `duckdb` database rather than a BigQuery database.
+1. Change the `fact_trips` and `fact_fhv_trips` models so that they only include trips that ocurred in 2019 and 2020 (i.e. filter out trips with outlier date values).
+
+Finally, you should run this `dbt` project and then use `piperider` to generate a report. By looking over the summary statistics in this report, you should be able to answer all of the homework questions.
+
+### Answer
+
+
+Let's first install the requirements listed in `requirements.txt`:
+```bash
+pip install -r requirements.txt
+```
+
+Next, we'll download the required CSV files and ingest them into our `duckdb` database. For convenience, we'll use the `download.py` and `ingest.py` Python scripts we've written to achieve this:
+```bash
+python3 download.py && \
+python3 ingest.py
+```
+Note that `download.py` will create a new subdirectory called `data`, inside which all of the downloaded CSVs will be placed. Additionally, the `ingest.py` script will create a `taxi.duckdb` database file inside of your current directory, and will additionally created a 'combined' Parquet file for each group of CSV files (i.e. one Parquet file for the yellow taxi data, another for the green taxi data, etc).
+
+With the data ingested, we can now appropriately modify our `dbt` project; here's a summary of the changes we've made:
+1. We've changed the `profiles.yml` file, which was initially configured to connect to a BigQuery database:
+```yaml
+ny_taxi:
+  outputs:
+    dev:
+      dataset: taxi_data
+      job_execution_timeout_seconds: 100
+      job_retries: 1
+      keyfile: "{{ env_var('GCP_KEY_PATH') }}"
+      location: australia-southeast1
+      method: service-account
+      priority: interactive
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      threads: 4
+      type: bigquery
+  target: dev
+```
+to a `duckdb` configuration:
+```yaml
+ny_taxi:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH') }}"
+      threads: 4
+```
+Notice here that , we now need to define an environment variable `DUCKDB_PATH` which specifies the directory of our `duckdb` database file.
+1. To speed up our `dbt` project, we've removed all of the data tests from the staging models. Although it's 'best practice' to have these tests in place for production, they aren't necessary for answering the homework questions, and they take quite long to run locally.
+1. We've modified the `fact_trips` and `fact_fhv_trips` models so that only trip records that took place between 2019 and 2020 are kept (i.e. we've excluded all incorrectly entered trip dates).
+
+With these modifications made, we can now run our `dbt` project and create our `piperider` report. We can do both of these steps in one go by running the following commands:
+```bash
+# Run dbt project:
+export DUCKDB_PATH="$(pwd)/taxi.duckdb"
+cd dbt/ny_taxi && \
+dbt deps && \
+dbt build && \
+# Initialise piperider and create report:
+piperider init && \
+piperider diagnose && \
+piperider run && \
+cd ../..
+```
+Note that these commands will take between 5 - 10 minutes to run until completion.
+
+Once everything has run, you should be able to open the report created by `piperider`; `piperider` should indicate the location of the generated report in your terminal. For the sake of reproducability, we've copied over the report generated by `piperider` into the `piperider_report` subdirectory within the `01-piperider/homework` directory. To read this copied `piperider` report, simply open the `index.html` file in `piperider_report` with your web browser of choice.
+
+With the `piperider` report now open, all of the homework questions can now easily be answered.
+
+## Question 1
+
+### Question
+
+What is the distribution of values for `vendor_id` in the `fact_trips` table? Choose from the following options:
+- 70.1%, 29.6%, 0.5%
+- 60.1%, 39.5%, 0.4%
+- 90.2%, 9.5%, 0.3%
+- 80.1%, 19.7%, 0.2%
+
+### Answer
+
+By clicking on the `fact_trips` option in the 'Tables' dropdown menu, you should be able to see a list of all the columns in the `fact_trips` table. By then selecting the `vendor_id` column, we'll be presented with a variety of statistics about the values in this column, including the distribution of values for this column:
+
+![Piperider summary statistics for `vendor_id` column in `fact_trips` table.](screenshots/q1.png)
+
+From the Piperider report, we see that the **60.1%, 39.5%, 0.4%** answer most closely matches the distribution statistics in the report.
+
+## Question 2
+
+### Question
+
+How many records in `fact_trips` have a positive, zero, and negative `total_amount` value? Choose from the following options:
+- 51.4M positive, 15K zero, 48.6K negative
+- 21.4M positive, 5K zero, 248.6K negative
+- 61.4M positive, 25K zero, 148.6K negative
+- 81.4M positive, 35K zero, 14.6K negative
+
+### Answer
+
+Next, we click on the `total_amount` option in the `fact_trips` table drop-down menu. This should display a break-down of the  number of `total_amount` values that are positive, are negative, and are zero:
+
+![Piperider summary statistics for `total_amount` column in `fact_trips` table.](screenshots/q2.png)
+
+From the Piperider report, we see that the **61.4M positive, 25K zero, 148.6K negative** answer most closely matches the distribution statistics in the report.
+
+## Question 3
+
+### Question
+
+What are the numerical summary statistics of the `trip_distance` values in the `fact_trips` table? Choose from the following options:
+- Average: 1.95, Standard Deviation: 35.43, Min: 0, Max: 16.3K, Sum: 151.5M
+- Average: 3.95, Standard Deviation: 25.43, Min: 23.88, Max: 267.3K, Sum: 281.5M
+- Average: 5.95, Standard Deviation: 75.43, Min: -63.88, Max: 67.3K, Sum: 81.5M
+- Average: 2.95, Standard Deviation: 35.43, Min: -23.88, Max: 167.3K, Sum: 181.5M
+
+### Answer
+
+Finally, we click on the `trip_distance` option in the `fact_trips` table drop-down menu. This should display numerical summary statistics for the `trip_distance` values:
+
+![Piperider summary statistics for `trip_distance` column in `fact_trips` table.](screenshots/q3.png)
+
+From the Piperider report, we see that the **Average: 2.95, Standard Deviation: 35.43, Min: -23.88, Max: 167.3K, Sum: 181.5M** answer most closely matches the distribution statistics in the report.
