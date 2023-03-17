@@ -1,0 +1,11 @@
+{
+  "namespace": "taxi",
+  "type": "record",
+  "name": "GreenRecordKey",
+  "fields": [
+    {
+      "name": "lpep_pickup_datetime",
+      "type": "string"
+    }
+  ]
+}

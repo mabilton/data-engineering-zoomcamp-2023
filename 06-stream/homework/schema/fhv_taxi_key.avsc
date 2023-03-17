@@ -1,0 +1,11 @@
+{
+  "namespace": "taxi",
+  "type": "record",
+  "name": "FhvRecordKey",
+  "fields": [
+    {
+      "name": "pickup_datetime",
+      "type": ["string"]
+    }
+  ]
+}

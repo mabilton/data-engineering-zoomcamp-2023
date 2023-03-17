@@ -1,0 +1,33 @@
+{
+  "namespace": "taxi",
+  "type": "record",
+  "name": "FhvRecord",
+  "fields": [
+    {
+      "name": "PUlocationID",
+      "type": ["null", "int"]
+    },
+    {
+      "name": "DOlocationID",
+      "type": ["null", "int"]
+    },
+    {
+      "name": "pickup_datetime",
+      "type": "string"
+    },
+    {
+      "name": "dropOff_datetime",
+      "type": "string"
+    },
+    {
+      "name": "dispatching_base_num",
+      "type": "string"
+    },
+    {
+      "name": "SR_Flag",
+      "type": ["null", "boolean"]
+    }
+  ]
+}
+
+	

@@ -1,0 +1,31 @@
+{
+  "namespace": "taxi",
+  "type": "record",
+  "name": "GreenRecord",
+  "fields": [
+    {
+      "name": "PULocationID",
+      "type": "int"
+    },
+    {
+      "name": "lpep_pickup_datetime",
+      "type": "string"
+    },
+    {
+      "name": "lpep_dropoff_datetime",
+      "type": "string"
+    },
+    {
+      "name": "passenger_count",
+      "type": "int"
+    },
+    {
+      "name": "trip_distance",
+      "type": "float"
+    },
+    {
+      "name": "fare_amount",
+      "type": "float"
+    }
+  ]
+}
