@@ -34,3 +34,7 @@ terraform.tfstate*
 # DuckDB database files:
 *.duckdb
 *.duckdb.*
+
+# Spark & Kafka files:
+checkpoint
+spark-wharehouse
