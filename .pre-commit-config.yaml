@@ -25,6 +25,6 @@ repos:
     -   id: flake8
         language_version: python3
         args:
-          - "--max-line-length=88"
+          - "--max-line-length=99"
           # Allow for lambda functions, line break before binary op, trailing whitespace:
           - "--ignore=E731, W503, W291"

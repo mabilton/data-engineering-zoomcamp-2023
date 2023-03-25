@@ -1,0 +1,3 @@
+This directory contains two different implementations of Kafka consumers in Python:
+- `confluent_consumer.py` contains a Kafka consumer implemented using the `confluent` Python package; this consumer is configured to correctly consume and deserialise messages produced to Kafka using the producer in `confluent_producer.py`.
+- `kafka_python_consumer.py` contains a Kafka consumer implemented using the `kafka-python` package; this consumer is configured to correctly consume and deserialise messages produced to Kafka using the producer in `kafka_python_producer.py`.

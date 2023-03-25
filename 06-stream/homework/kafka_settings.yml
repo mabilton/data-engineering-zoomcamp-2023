@@ -4,6 +4,6 @@ green_value_schema: './schema/green_taxi_value.avsc'
 fhv_key_schema: './schema/fhv_taxi_key.avsc'
 fhv_value_schema: './schema/fhv_taxi_value.avsc'
 
-registry_url: 'http://localhost:8081'
+schema_registry_url: 'http://localhost:8081'
 bootstrap_servers: 'localhost:9092'
 broker: '0.0.0.0:9092'
