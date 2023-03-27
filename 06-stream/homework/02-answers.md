@@ -233,9 +233,3 @@ Before opening the `03-streaming-app.ipynb` notebook, however, we'll need to sta
 docker compose up -d
 ```
 **inside of the `06-stream/homework` directory**; this will execute the Docker containers defined in `docker-compose.yml`; the configuration settings associated with this Kafka cluster are listed in `kafka_settings.yml`.
-
-Once you're finished running all the code in the `03-streaming-app.ipynb` notebook, you can shut-down the Kafka cluster by running:
-```bash
-docker compose down
-```
-Once again, this should be executed **inside of the `06-stream/homework` directory**.
