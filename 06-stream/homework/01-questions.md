@@ -62,13 +62,14 @@ Which options must be specified when creating a Kafka Consumers, but don't need 
 
 In the second part of this homework, we'll actually be implementing a Kafka streaming application.
 
-Implement a Kafka streaming application that reads ride records from the following CSVs:
+Implement a Kafka streaming application that reads ride records stored in the following CSVs:
 1. `fhv_tripdata_2019-01.csv.gz` (available at this link)
 2. `green_tripdata_2019-01.csv.gz` (available at this link)
-and these records into their own Kafka topic (e.g. the trips read from `fhv_tripdata_2019-01.csv.gz` are placed into the `fhv_trips` topic, and the trips read from `green_tripdata_2019-01.csv.gz` are placed into the `green_trips` topic).
+and uploads them into their own separate Kafka topics, one for each CSV (e.g. the trips read from `fhv_tripdata_2019-01.csv.gz` are placed into the `fhv_trips` topic, and the trips read from `green_tripdata_2019-01.csv.gz` are placed into the `green_trips` topic).
 
 Your code should include the following components:
-1. A Kafka Producer that reads each Taxi CSV file, and uploads .
-2. A PySpark Streaming application that reads from both the Green taxi and FHV taxi topics created in Kafka, merges them into a single dataframe, and then writes this merged dataframe into a new Kafka topic (i.e. an '`all_rides`' topic). Appropriate transformations and aggregations should then be applied to the merged dataframe to rank the popularity of each `PUlocationID` across both the Green and FHV trip datasets.
+1. A Kafka Producer that reads each Taxi CSV file, and uploads the read data into a specified Kafka topic.
+1. A Kafka Consumer that can read from the topics written to by your Kafka producer.
+1. A PySpark Streaming application that reads from both the Green taxi and FHV taxi topics created in Kafka, merges them into a single dataframe, and then writes this merged dataframe into a new Kafka topic (i.e. an '`all_rides`' topic). Appropriate transformations and aggregations should then be applied to the merged dataframe to rank the popularity of each `PUlocationID` across both the Green and FHV trip datasets.
 
 Note that it is not necessary to find an exact number for the popularity of each `PUlocationID` across both datasets, so if you encounter memory related issue, it's fine to analyse only a smaller subset of the records in each CSV.

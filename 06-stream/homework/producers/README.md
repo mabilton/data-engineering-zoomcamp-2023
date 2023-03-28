@@ -1,0 +1,3 @@
+This directory contains two different implementations of Kafka producers in Python. Both producers are written to produce Green taxi and FHV taxi data to a Kafka cluster. More specifically:
+- `confluent_producer.py` contains a Kafka producer implemented using the `confluent` Python package; this producer uses the Arvo schema files in the `schema/` directory to serialise each message and key value.
+- `kafka_python_producer.py` contains a Kafka producer implemented using the `kafka-python` package; this producer first appends all of the message values into a single string, and then serialises this string.

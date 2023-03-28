@@ -4,8 +4,8 @@
   "name": "GreenRecordKey",
   "fields": [
     {
-      "name": "VendorID",
-      "type": "int"
+      "name": "lpep_pickup_datetime",
+      "type": "string"
     }
   ]
 }

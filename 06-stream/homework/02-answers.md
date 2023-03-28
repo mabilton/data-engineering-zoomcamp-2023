@@ -1,9 +1,15 @@
 # Week 6 Homework Answers
 
+This file contains my answers to the Week 6 homework questions for the 2023 cohort of the Data Engineering Zoomcamp. For convenience, each question is restated before giving the corresponding answer; the list of questions *without* corresponding answers can be found in `01-questions.md`, which can be found in the current directory.
 
-# Part 1: Theoretical Questions
+Please note that all of the intructions provided here **assume that your terminal is located in the `06-stream/homework` directory**.
 
-https://www.youtube.com/watch?v=SXQtWyRpMKs&list=PL3MmuxUbc_hJed7dXYoJw8DoCuVHhGEQb&index=63
+## Set-Up
+
+Before going through these answers, you should install the requirements listed in `requirements.txt`:
+```bash
+pip install -r requirements.txt
+```
 
 ## Section 1: Theoretical Questions
 
@@ -62,7 +68,6 @@ Which of the following Kafka features support scaling?
 - *Topic Replication* - **True**. As of Kafka 2.4, it's possible for consumers to read topics not only from the leader replica nodes, but also from the follow replica nodes (see [here](https://stackoverflow.com/questions/37803376/consuming-from-a-replica) and [here](https://cwiki.apache.org/confluence/display/KAFKA/KIP-392%3A+Allow+consumers+to+fetch+from+closest+replica)). This means that increasing the replication factor of a topic increases the number of nodes that a consumer can read a particular topic from, which allows for increased consumer parallelism, which is very useful as the amount of consumer traffic increases.
 - *Topic Partitioning* - **True**. Partitioning allows for multiple consumers to read from the same topic simultaneously, which allows for a Kafka cluster to remain performant, even as the amount of consumer traffic increases. 
 - *Consumer Group ID* - **True**. Multiple consumers within a single group can read from multiple partitions within a topic simultaneously; this significantly speeds up read times and, thererfore, ensures the the Cluster works quickly, even when consumers must read millions of messages from a topic.
-
 - *Ack All* - **False**. When 'Ack All' is specified, producers must wait for confirmation from all of the replica followers before writing their next batch of data to the topic. Although waiting for this confirmation increases robustness, this comes at the cost of latency and, therefore, scalability, since producers aren't able to perform as many writing operations within a set period of time; this may become an issue if we need to be able to write lots of data to our cluster quickly. Indeed, when choosing what level of acknowledgement to specify for our Kafka cluster, the main thing to consider is the trade-off between performance and reliability: lower acknowledgement levels allow for produces to write to the cluster faster, but are less reliable, whereas higher achnowledgement levels ensure more robvust topic replication, but means that producers take longer to write. The performance-reliability trade-off of different acknowledgement settings is explained in more detail [here](https://www.confluent.io/blog/configure-kafka-to-minimize-latency/#End-to-end_latency_vs._producer_and_consumer_latencies).
 
 
@@ -72,73 +77,101 @@ Which of the following Kafka features support scaling?
 
 Which of the following columns in the Green Taxi dataset are good candidates for being chosen as a topic partitioning key? Consider the cardinality and the scaling implications of the field(s) you select:
 - `payment_type`
-- `vendor_id`
+- `VendorID`
 - `passenger_count`
 - `total_amount`
-- `tpep_pickup_datetime`
-- `tpep_dropoff_datetime`
+- `lpep_pickup_datetime`
+- `lpep_dropoff_datetime`
 
 #### Answer
 
-When choosing which column should be used as a partition key, there are a few points to keep in mind:
-1. *Number of partitions* - If we partition a topic by a column that contains millions of different values, then Kafka will have to produce millions of different partitions, which means that a significant number of these partitions will tend to be unused, which is wasteful. Additionally, Kafka needs to create new partitions for each new value encountered in the partitioning key; this means that we not only need to consider the number of values a column currently contains, but also the number of values we expect it to contain *in the future*. 
-1. *Data distribution* - Ideally, the messages within a topic should be equally distributed amongst the partitions of that topic: this ensures that all of the partitions can be utilised when  consumer(s) read from that topic. Additionally, we'd prefer that any new data written to a topic is as evenly distributed amongst the topic partitions as possible. If this weren't the case, consumers would be only be able to read from a limited number of paritions to consume the latest messages within a topic, which reduces performance. 
+When it comes to choosing a column to partition our streaming data by, we want to choose a key that ensures that our messages are distributed as evenly as possible over all of the partitions. Towards this end, we ought to choose a column that contains a **large range of different values** (i.e. has a high cardinality). 
 
-With these two points in mind, let's evaluate how appropriate each of these columns are as partition keys: 
+##### Theoretical Background
 
-- `vendor_id` is a **good candidate** for being a partition key. This is because all of these columns contain a limited number of integer values and, therefore, partitioning by these columns means that an excessive number of partitions won't be formed. Additionally, the distribution of data within this column isn't excessively skewed towards particular values (at least within the `green_tripdata_2019-01.csv.gz` dataset, which we use in Question 6 of this homework). To confirm that the distribution of `vendor_id` values is, indeed, sufficiently uniform, we can use the `print_csv_values_count` convenience function that we've defined inside the `utils.py` file within this `homework` directory (**NB**: make sure you've run `pip install -r requirements.txt` before running the following command):
+To understand why this is the case, let's recall how Kafka uses a key value to decide which partition a message should be stored in:
+1. A *hash function* is used to compute the hash value of the message's key. Importantly, hash functions are *deterministic*, meaning that they return the exact same hash value if given the same key value input.
+1. The remainder after dividing this hash value by the number of partitions in our cluster is computed (i.e. `hash(key) % num_partitions`, where `hash(key)` denotes the hash function acting on our key value). The result of this calculation must be an integer from `0` to `num_partitions - 1` (i.e. there are `num_partition` possible results), so this value can be used to assign the message to a particular partition.
+1. Because hash functions return the same hash value for identical inputs, this process is guaranteed to allocate messages with the same key to the same partition. This process does not gaurantee, however, that messages with different keys will be in placed different partitions, since:
+    - Different key values may map to the same hash value output (i.e. the hash function could be a many-to-one mapping, rather than a one-to-one mapping)
+    - Even if the hash values of the two key values are different, the remainder after dividing the different hash values by `num_partitions` might still be equal.
+
+Now that we've recalled how Kafka uses key values to allocate messages, let's more formally describe this allocation process. Let $m$ denote the total number of unique values contained in our chosen partition key column, $n$ is the total number of unique hash values that can be generated from all the values in this key column, $p$ is the number of partitions in our cluster, and $\tilde{p}$ is the maximum number of different outputs that can be generated by the Kafka allocation algorithm we've just described (i.e. $\tilde{p}$ is the total number of partitions that Kafka is capable of allocating messages to using this algorithm).
+
+Since each input into a hash function must map to exactly one hash value output, the number of different hash values $n$ that can be generated from $m$ different inputs must satisfy:
+
+$$
+n \leq m
+$$
+
+i.e. we can't generate more unique hash values than unique inputs, although we may produce fewer hash values than inputs if different inputs map to the same hash value. 
+
+If $n$ is less than the number of partitions $p$, then the computation `hash(key) % num_partitions` will only be able to produce a maximum of $n$ different outputs: the 'maximal case' occurs if dividing each one of the $n$ different hash values by $p$ returns a different remainder value. Conversely, if $n$ is larger than $p$, then the maximum number of different outputs that can be produced by calculating `hash(key) % num_partitions` is $p$, since this modulus calculation can only output values between `0` and `num_partitions - 1` (i.e. $p$ different outputs). The maximum number of outputs that can be produced by Kafka's partition allocation procedure $\tilde{p}$ must satisfy then:
+
+$$
+\tilde{p} \leq 
+\begin{cases}
+n \text{ if } n \lt p \\
+p \text{ if } p \leq n \\
+\end{cases} = \text{min}(n, p)
+$$
+
+By combining this result with the fact that $n \leq m$, we deduce that:
+
+$$
+\text{min}(n, p) \leq \text{min}(m, p)
+$$
+
+which means that:
+$$
+\tilde{p} \leq \text{min}(m, p)
+$$
+
+So what is this formula saying? It's saying that the maximum number of partitions that Kafka can assign topics to using a partition key is limited by *either*:
+1. The number of partitions in our cluster $p$
+2. The number of unique values contained in our key column $m$
+
+This means that if the number of partitions in our Kafka cluster $p$ is greater than the number of unique values in our key column $m$, then it's guaranteed that some of partitions will not be allocated any data. To avoid this situation, we want to choose a key column that contains many more unique values than there are partitions in our cluster (i.e. $m \gg p$): although this doesn't guarantee that all our partitions will be used (e.g. if our different key values might happen to map to the same hash value, or if the remainder after dividing each hash value by the number of partitions is the same), it does ensure that it's *not impossible* for us to utilise all our partitions.
+
+To better illustrate this point, let's consider an 'extreme' case where we have two partitions, but our partition key column only contains one unique value. Since our key column only contains one unique value here, computing `hash(key) % num_partitions` will return the same result for each message, which means all of our messages will be allocated to the same partition, leaving the other partition empty. Although selecting a key column with two unique values wouldn't guarantee that both partitions are used, it's now at least *possible* that both partitions are used (i.e. if `hash(key) % 2` returns `0` for one of the unique values in the key column, and `1` for the other unique value).
+
+##### Application of Theory to Question
+
+Now that we understand how the number of partitions Kafka can assign messages to is related to the cardinality of our chosen partition key, let's now decide which of the columns listed in the original question are 'good partition key candidates'.
+
+Since the `total_amount`, `lpep_pickup_datetime`, and `lpep_dropoff_datetime` are all continuous quantities, they should contain a large number of unique values (i.e. have a high cardinality) and, therefore, be **good partition key candidates**. To confirm that this is the case, we can use the `print_csv_cardinality` convenience function defined in the `utils.py` file inside this directory (make sure you've run `pip install -r requirements.py` first):
 ```bash
 CSV_URL='https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_2019-01.csv.gz' && \
-python3 -c "from utils import print_csv_values_count; print_csv_values_count('${CSV_URL}', column='VendorID');"
+python3 -c "from utils import print_csv_cardinality; print_csv_cardinality('${CSV_URL}', column='total_amount')" && \
+python3 -c "from utils import print_csv_cardinality; print_csv_cardinality('${CSV_URL}', column='lpep_pickup_datetime')" && \
+python3 -c "from utils import print_csv_cardinality; print_csv_cardinality('${CSV_URL}', column='lpep_dropoff_datetime')"
 ```
-This prints the following output to the terminal:
+This prints:
 ```
-2    537235
-1     93683
-Name: VendorID, dtype: int64
+Number of unique values in 'total_amount' column: 7475
+Number of unique values in 'lpep_pickup_datetime' column: 541269
+Number of unique values in 'lpep_dropoff_datetime' column: 540701
 ```
-i.e. approximately 85% of the data has a `VendorID` of `2`, whilst the rest of the data as a `VendorID` of `1`. Although this data distribution is obviously not uniform, it's probably 'good enough' for many practical purposes.
+Based on our previous theoretical analysis, any one of these keys *could possibly* support thousands of partitions, which is useful should we want to scale-up our cluster by adding more partitions.
 
-- The `payment_type` and `passenger_count` columns are, on the other hand, **bad candidates**:
+On the other hand, the `payment_type`, `VendorID`, and `passenger_count` appear to contain a significantly smaller number of unique values; we can see this by executing:
 ```bash
 CSV_URL='https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_2019-01.csv.gz' && \
-python3 -c "from utils import print_csv_values_count; print_csv_values_count('${CSV_URL}', column='payment_type');"
+python3 -c "from utils import print_csv_cardinality; print_csv_cardinality('${CSV_URL}', column='payment_type')" && \
+python3 -c "from utils import print_csv_cardinality; print_csv_cardinality('${CSV_URL}', column='VendorID')" && \
+python3 -c "from utils import print_csv_cardinality; print_csv_cardinality('${CSV_URL}', column='passenger_count')"
 ```
-which prints:
+This prints:
 ```bash
-1    388313
-2    237857
-3      3392
-4      1330
-5        26
-Name: payment_type, dtype: int64
+Number of unique values in 'payment_type' column: 5
+Number of unique values in 'VendorID' column: 2
+Number of unique values in 'passenger_count' column: 10
 ```
+These columns are, therefore, **poor partition key candidates**, since they'd only be able to support a relatively small number of partitions. Indeed, if we chose the `VendorID` column as a paritition key, only two of our partitions would actually store data.
 
-Similarly:
-```bash
-CSV_URL='https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_2019-01.csv.gz' && \
-python3 -c "from utils import print_csv_values_count; print_csv_values_count('${CSV_URL}', column='passenger_count');"
-```
-This prints to the terminal:
-```bash
-1    543508
-2     44105
-5     20550
-6     10040
-3      8175
-4      3044
-0      1462
-8        16
-9        11
-7         7
-Name: passenger_count, dtype: int64
-```
+##### Limitations of Looking at Cardinality Alone
 
-
-`total_amount`, `tpep_pickup_datetime`, `tpep_dropoff_datetime` are all **bad choices** for partition keys; this is for a few of reasons:
-1. All of these columns will contain, which means that a large number of partitions will be generated. 
-1. It's almost certain that the number of partitions would expand over time. In the case of the `total_amount` column, inflation means that the cost of each taxi trip will tend to increase over time and, therefore, that new paritions would need to be generated 
-1. 
+In answering Question 4, we only considered the cardinality of each column when deciding if that column is appropriate to be used as a message key. The cardinality of a column, however, is not the only thing we should consider when deciding whether that column's values would be appropriate message keys. We should, for instance, also consider the *distribution* of values within the column: intuitively, columns with more uniformly distributed will tend to produce a more uniform distribution of hash values and, therefore, should result in a more equal distribution of data among the partitions in our cluster.
 
 ### Question 5
 
@@ -154,49 +187,49 @@ Which options *should* be specified when creating a Kafka Consumer, but *don't* 
 
 #### Answer
 
-Let's go thr
-- *A Deserializer* - **True**. Consumers **must be provided** with a deserializer, whereas producers do not; instead, producers must be given a *serializer*. Recall that before a producer writes data to a Kafka cluster, it first must serialize this data into bytes; when this data is subsequently read by a consumer, the key and values of the read message are still in bytes, and the must be desrialized to a useable format (e.g. a string).
+Let's go through each of these options in turn:
+
+- *A Deserializer* - **True**. Recall that before a producer writes data to a Kafka cluster, it first must serialize this data into bytes; when this data is subsequently read by a consumer, the key and values of the read message are still in bytes and, therefore, must be deserialized to a useable format (e.g. a string). In summary then, producers need to be supplied with a serializer, but consumers need to be given a deserializer.
 - *A Topic to Subscribe to* - **True**. Although we *do* need to specify which topic a producer should write data to, a producer doesn't 'subscribe' to a topic: by definition, only consumers 'subscribe to' (i.e. read) from topics.
-- A Bootstrap Server - **False**. A bootstrap server must be specified for both Consumers and Producers
-- A Group ID - **True**. Producers are *not* grouped into groups, but Consumers *are*; consequently, we need to provide a Group ID when creating a consumer, but not when creating a producer.
+- *A Bootstrap Server* - **False**. Within the context of a Kafka cluster, bootstrap server(s) are the initial server(s) you connect to when to connect to a Kafka cluster. The purpose of each bootstrap server is to list the full set of broker nodes that exist within the Kafka cluster. Since connecting to a bootstrap server is required to establish a connection to the cluster itself, *both* consumers and producers need to be specified with a bootstrap server.
+- *A Group ID* - **True**. Producers are *not* organised into groups, whereas Consumers *are*; consequently, we need to provide a Group ID when creating a consumer, but not when creating a producer.
 - *An Offset* - **True**. When Producers write data to a Kafka cluster, they append that new data to the *end* of the topic (i.e. the new data is added on starting from the *latest* offset index), which means they *don't* need to be provided with an initial offset. Conversely, consumers can read data starting from the *very first* message in the topic, or from the *latest* message sent to that topic. To ensure that , one should specify the initial offset of a consumer;
-
-only new write data to the very end of the topic (i.e. larger offset index
-). Conversely, we need to tell a consumer whether it should 
-- *A Cluster Key and/or Cluster Secret* - **False**. If your Kafka Cluster is configured  
-
-One **must specify** which topic a 
-- *A Bootstrap Server* - **False**
-- *A Group ID* - **True**
-- *An Offset* - **True**
-- *A Cluster Key and/or Cluster Secret* - **False**
+- *A Cluster Key and/or Cluster Secret* - **False**. If a key or password is needed to access a cluster, *both* consumers and producers connecting to that cluster must be provided with this key/secret.
 
 ## Part 2: Practical Implementation Questions
 
-### Question
+### Question 
 
-Implement a Kafka streaming application that reads ride records from the following CSVs:
-1. `fhv_tripdata_2019-01.csv.gz` (available at this link)
-2. `green_tripdata_2019-01.csv.gz` (available at this link)
-and these records into their own Kafka topic (e.g. the trips read from `fhv_tripdata_2019-01.csv.gz` are placed into the `fhv_trips` topic, and the trips read from `green_tripdata_2019-01.csv.gz` are placed into the `green_trips` topic).
+Implement a Kafka streaming application that reads ride records stored in the following CSVs:
+1. `fhv_tripdata_2019-01.csv.gz` (available at [this link]())
+1. `green_tripdata_2019-01.csv.gz` (available at this [this link]())
+and uploads them into their own separate Kafka topics, one for each CSV (e.g. the trips read from `fhv_tripdata_2019-01.csv.gz` are placed into the `fhv_trips` topic, and the trips read from `green_tripdata_2019-01.csv.gz` are placed into the `green_trips` topic).
 
 Your code should include the following components:
-1. A Kafka Producer that reads each Taxi CSV file, and uploads .
-2. A PySpark Streaming application that reads from both the Green taxi and FHV taxi topics created in Kafka, merges them into a single dataframe, and then writes this merged dataframe into a new Kafka topic (i.e. an '`all_rides`' topic). Appropriate transformations and aggregations should then be applied to the merged dataframe to rank the popularity of each `PUlocationID` across both the Green and FHV trip datasets.
+1. A Kafka Producer that reads each Taxi CSV file, and uploads the read data into a specified Kafka topic.
+1. A Kafka Consumer that can read from the topics written to by your Kafka producer.
+1. A PySpark Streaming application that reads from both the Green taxi and FHV taxi topics created in Kafka, merges them into a single dataframe, and then writes this merged dataframe into a new Kafka topic (i.e. an '`all_rides`' topic). Appropriate transformations and aggregations should then be applied to the merged dataframe to rank the popularity of each `PUlocationID` across both the Green and FHV trip datasets.
 
 Note that it is not necessary to find an exact number for the popularity of each `PUlocationID` across both datasets, so if you encounter memory related issue, it's fine to analyse only a smaller subset of the records in each CSV.
 
 ### Answer
 
+The `03-streaming-app.ipynb` notebook in this directory implements a streaming application that meets all the requirements specified in the question. The notebook itself utilises data and code that is defined within the following files and directories:
+
+- The `schema/` directory houses numerous [Apache Arvo](https://en.wikipedia.org/wiki/Apache_Avro) files that specify the schema for the message keys and values we generate for our Kafka Cluster. It's worth noting that the message keys and values for the FHV taxi dataset and the Green taxi dataset are different, and hence require different schemas. This means that `schema/` contains four Arvo files: one for the FHV message key, another for the FHV message value, one for the Green message key, and another for the Green message value.
+- The `producers/` directory contains two Python-based implementations of Kafka producers that can write Taxi ride data in CSV format to a Kafka cluster:
+    1. `producers/confluent_producer.py` contains a Kafka producer implemented using the `confluent` Python package; this implementation uses the Arvo schema defined inside of the `schema/` subsirectory to help serialize each taxi record.
+    1. `producers/kafka_python_producer.py` contains a Kafka producer implemented using the `kafka-python` package; this implementation serializes the each taxi record by appending all the values together as a string, and then serializing this single string.
+- The `consumers/` directory contains two Python-based implementations of Kafka consumers that can read messages written to our Kafka cluster by the producers defined in `producers/`:
+    1. `consumers/confluent_consumer.py` contains a Kafka consumer implemented using the `confluent` Python package; this consumer is capable of reading messages produced to a topic by the `producers/confluent_producer.py` producer.
+    1. `consumers/kafka_python_consumer.py` contains a Kafka consumer implemented using the `kafka-python` Python package; this consumer is capable of reading messages produced to a topic by the `producers/kafka_python_producer.py` producer.
+- `streaming.py` contains functions to read, write, and transform PySpark Streaming Dataframes.
+- `utils.py` contains a variety of utility functions; some of these are called within the `streaming.ipynb` notebook.
+
+For further details about any one of these components, please refer to the documentation within the respective code file.
+
+Before opening the `03-streaming-app.ipynb` notebook, however, we'll need to start up a local Kafka cluster. To do this, run:
 ```bash
 docker compose up -d
 ```
-
-Next, start a Jupyter
-
-
-
-Once you're done, you'll want to ma
-```bash
-docker compose down
-```
+**inside of the `06-stream/homework` directory**; this will execute the Docker containers defined in `docker-compose.yml`; the configuration settings associated with this Kafka cluster are listed in `kafka_settings.yml`.

@@ -4,8 +4,8 @@
   "name": "FhvRecordKey",
   "fields": [
     {
-      "name": "DOlocationID",
-      "type": ["null", "int"]
+      "name": "pickup_datetime",
+      "type": ["string"]
     }
   ]
 }
