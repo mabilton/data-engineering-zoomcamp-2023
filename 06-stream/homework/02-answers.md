@@ -171,7 +171,7 @@ These columns are, therefore, **poor partition key candidates**, since they'd on
 
 ##### Limitations of Looking at Cardinality Alone
 
-In answering this question, we've only considered the cardinality. In particular, the *distribution*.
+In answering Question 4, we only considered the cardinality of each column when deciding if that column is appropriate to be used as a message key. The cardinality of a column, however, is not the only thing we should consider when deciding whether that column's values would be appropriate message keys. We should, for instance, also consider the *distribution* of values within the column: intuitively, columns with more uniformly distributed will tend to produce a more uniform distribution of hash values and, therefore, should result in a more equal distribution of data among the partitions in our cluster.
 
 ### Question 5
 
